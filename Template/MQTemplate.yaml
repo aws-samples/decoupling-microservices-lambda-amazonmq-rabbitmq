@@ -1,0 +1,815 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Mappings:
+  SubnetConfig:
+    VPC:
+      CIDR: "10.0.0.0/16"
+    Private0:
+      CIDR: "10.0.1.0/24"
+    Private1:
+      CIDR: "10.0.2.0/24"
+    Private2:
+      CIDR: "10.0.3.0/24"
+  # This mapping accounts for the scenario when certain AZs
+  # are not available to use (this differs on a per account
+  # per customer basis). E.g., if the 'b' AZ is not available
+  # in a specific region in one's account then updating the
+  # list contained in the mapping below here will allow a
+  # different AZ to be chosen.
+  AZRegions:
+    ap-northeast-1:
+      AZs: ["a", "b", "c"]
+    ap-northeast-2:
+      AZs: ["a", "b", "c"]
+    ap-south-1:
+      AZs: ["a", "b", "c"]
+    ap-southeast-1:
+      AZs: ["a", "b", "c"]
+    ap-southeast-2:
+      AZs: ["a", "b", "c"]
+    ca-central-1:
+      AZs: ["a", "b", "c"]
+    eu-central-1:
+      AZs: ["a", "b", "c"]
+    eu-west-1:
+      AZs: ["a", "b", "c"]
+    eu-west-2:
+      AZs: ["a", "b", "c"]
+    sa-east-1:
+      AZs: ["a", "b", "c"]
+    us-east-1:
+      AZs: ["a", "b", "c"]
+    us-east-2:
+      AZs: ["a", "b", "c"]
+    us-west-1:
+      AZs: ["a", "b", "c"]
+    us-west-2:
+      AZs: ["a", "b", "c"]
+
+Parameters:
+  PikaLayerARN:
+    Description: Layer ARN for PIKA 
+    Type: String
+
+Resources:
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      CidrBlock:
+        Fn::FindInMap:
+          - "SubnetConfig"
+          - "VPC"
+          - "CIDR"
+      Tags:
+        -
+          Key: "Application"
+          Value:
+            Ref: "AWS::StackName"
+        -
+          Key: "Network"
+          Value: "Public"
+        -
+          Key: "Name"
+          Value: "VPC For RMQ"
+ 
+  PrivateSubnet0:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId:
+        Ref: "VPC"
+      AvailabilityZone:
+        Fn::Sub:
+          - "${AWS::Region}${AZ}"
+          - AZ: !Select [ 0, !FindInMap [ "AZRegions", !Ref "AWS::Region", "AZs" ] ]
+      CidrBlock:
+        Fn::FindInMap:
+          - "SubnetConfig"
+          - "Private0"
+          - "CIDR"
+      Tags:
+        -
+          Key: "Application"
+          Value:
+            Ref: "AWS::StackName"
+        -
+          Key: "Network"
+          Value: "Private"
+        -
+          Key: "Name"
+          Value: !Join
+            - ''
+            - - 'private-'
+              - !Select [ 0, !FindInMap [ "AZRegions", !Ref "AWS::Region", "AZs" ] ]
+  PrivateSubnet1:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId:
+        Ref: "VPC"
+      AvailabilityZone:
+        Fn::Sub:
+          - "${AWS::Region}${AZ}"
+          - AZ: !Select [ 1, !FindInMap [ "AZRegions", !Ref "AWS::Region", "AZs" ] ]
+      CidrBlock:
+        Fn::FindInMap:
+          - "SubnetConfig"
+          - "Private1"
+          - "CIDR"
+      Tags:
+        -
+          Key: "Application"
+          Value:
+            Ref: "AWS::StackName"
+        -
+          Key: "Network"
+          Value: "Private"
+        -
+          Key: "Name"
+          Value: !Join
+            - ''
+            - - 'private-'
+              - !Select [ 1, !FindInMap [ "AZRegions", !Ref "AWS::Region", "AZs" ] ]
+
+  PrivateSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId:
+        Ref: "VPC"
+      AvailabilityZone:
+        Fn::Sub:
+          - "${AWS::Region}${AZ}"
+          - AZ: !Select [ 2, !FindInMap [ "AZRegions", !Ref "AWS::Region", "AZs" ] ]
+      CidrBlock:
+        Fn::FindInMap:
+          - "SubnetConfig"
+          - "Private2"
+          - "CIDR"
+      Tags:
+        -
+          Key: "Application"
+          Value:
+            Ref: "AWS::StackName"
+        -
+          Key: "Network"
+          Value: "Private"
+        -
+          Key: "Name"
+          Value: !Join
+            - ''
+            - - 'private-'
+              - !Select [ 2, !FindInMap [ "AZRegions", !Ref "AWS::Region", "AZs" ] ]
+
+  PrivateRouteTable0:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId:
+        Ref: "VPC"
+      Tags:
+        -
+          Key: "Name"
+          Value: private-route-table-0
+  PrivateRouteTable1:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId:
+        Ref: "VPC"
+      Tags:
+        -
+          Key: "Name"
+          Value: private-route-table-1
+  PrivateRouteTable2:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId:
+        Ref: "VPC"
+      Tags:
+        -
+          Key: "Name"
+          Value: private-route-table-2
+
+  RouteTableAssociation0:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PrivateSubnet0
+      RouteTableId:
+        Ref: PrivateRouteTable0
+
+  RouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PrivateSubnet1
+      RouteTableId:
+        Ref: PrivateRouteTable1
+
+  RouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PrivateSubnet2
+      RouteTableId:
+        Ref: PrivateRouteTable2
+
+  AmazonMQSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Limits security group ingress and egress traffic for the Amazon
+        MQ instance
+      VpcId: !Ref 'VPC'
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          CidrIp: 
+            Fn::FindInMap:
+              - "SubnetConfig"
+              - "VPC"
+              - "CIDR"
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  EndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Limits security group ingress and egress traffic to SecretManager Endpoint
+        MQ instance
+      VpcId: !Ref 'VPC'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 
+            Fn::FindInMap:
+              - "SubnetConfig"
+              - "VPC"
+              - "CIDR"
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref 'AWS::StackName'
+              - AmazonMQSecurityGroup
+
+  AmazonMQBroker:
+    Type: 'AWS::AmazonMQ::Broker'
+    Properties:
+      AutoMinorVersionUpgrade: false
+      BrokerName: RabbitBroker
+      DeploymentMode: CLUSTER_MULTI_AZ
+      EngineType: RabbitMQ
+      EngineVersion: 3.8.6
+      HostInstanceType: mq.m5.large
+      Logs:
+        General: true
+      MaintenanceWindowStartTime:
+        DayOfWeek: Monday
+        TimeOfDay: '22:45'
+        TimeZone: America/Los_Angeles
+      PubliclyAccessible: false
+      SecurityGroups:
+        - !Ref 'AmazonMQSecurityGroup'
+      SubnetIds:
+        - !Ref 'PrivateSubnet0'
+        - !Ref 'PrivateSubnet1'
+        - !Ref 'PrivateSubnet2'
+      Users:
+        - Password: !Join ['', ['{{resolve:secretsmanager:', !Ref SecretAmazonMQ, ':SecretString:password}}' ]]
+          Username: !Join ['', ['{{resolve:secretsmanager:', !Ref SecretAmazonMQ, ':SecretString:username}}' ]]
+
+  SecretAmazonMQ:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Description: 'This is the secret for my AmazonMQ instance'
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: 'password'
+        PasswordLength: 16
+        ExcludeCharacters: '"@/, :='
+
+  OrdersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: orders
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  API:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: example-lambda-proxy
+  Method:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: POST
+      ResourceId: !GetAtt API.RootResourceId
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref Authorizer
+      RestApiId: !Ref API
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APIFunction.Arn}/invocations
+        IntegrationHttpMethod: POST
+  Deployment:
+    DependsOn: Method
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref API
+      StageName: test
+
+  SMPolicy: 
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties: 
+      ManagedPolicyName: "LambdaSMPermission"
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Action: 
+              - secretsmanager:GetSecretValue
+            Resource: !Ref SecretAmazonMQ
+
+  DynamoPolicy: 
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties: 
+      ManagedPolicyName: "LambdaDynamoPermission"
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Action: 
+              - dynamodb:PutItem
+            Resource: !GetAtt OrdersTable.Arn
+
+  BrokerPolicy: 
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties: 
+      ManagedPolicyName: "LambdaBrokerPermission"
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Action: 
+              - mq:DescribeBroker
+            Resource: !GetAtt AmazonMQBroker.Arn 
+
+  MQTriggerPolicy: 
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties: 
+      ManagedPolicyName: "LambdaMQTriggerPermission"
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Action: 
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeSubnets
+              - ec2:DescribeVpcs
+            Resource: '*'
+
+  AuthFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  APIFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+        - !Ref SMPolicy
+
+  OrderProcessingFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+        - !Ref SMPolicy
+        - !Ref BrokerPolicy
+        - !Ref MQTriggerPolicy
+
+  OrderCompleteFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+        - !Ref SMPolicy
+        - !Ref BrokerPolicy
+        - !Ref DynamoPolicy
+        - !Ref MQTriggerPolicy
+
+  AuthFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.9
+      Role: !GetAtt AuthFunctionExecutionRole.Arn
+      Handler: index.lambda_handler
+      Layers: 
+        - !Ref PikaLayerARN
+      Code:
+        ZipFile: |
+          from __future__ import print_function
+          
+          def generatePolicy(principalId, effect, methodArn):
+              authResponse = {}
+              authResponse['principalId'] = principalId
+          
+              if effect and methodArn:
+                  policyDocument = {
+                      'Version': '2012-10-17',
+                      'Statement': [
+                          {
+                              'Sid': 'FirstStatement',
+                              'Action': 'execute-api:Invoke',
+                              'Effect': effect,
+                              'Resource': methodArn
+                          }
+                      ]
+                  }
+          
+                  authResponse['policyDocument'] = policyDocument
+          
+              return authResponse
+          
+          def lambda_handler(event, context):
+
+              # Verify and get information from id_token
+              token = event['authorizationToken']
+
+              # Deny access if the account is not a Google account
+              if token != 'tokenformq':
+                  return generatePolicy(None, 'Deny', event['methodArn'])
+
+              return generatePolicy(None, 'Allow', event['methodArn'])
+
+
+  APIFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.9
+      Role: !GetAtt APIFunctionExecutionRole.Arn
+      Handler: index.lambda_handler
+      Layers: 
+        - !Ref PikaLayerARN
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref 'AmazonMQSecurityGroup'
+        SubnetIds:
+          - !Ref 'PrivateSubnet0'
+          - !Ref 'PrivateSubnet1'
+          - !Ref 'PrivateSubnet2'
+      Environment:
+        Variables:
+          SecretManagerArn: !Ref SecretAmazonMQ
+          BrokerArn: !GetAtt AmazonMQBroker.Arn 
+      Code:
+        ZipFile: |
+          from __future__ import print_function
+          import pika
+          import ssl
+          import boto3
+          import json
+          import base64
+          import os
+          import uuid
+
+          client = boto3.client('secretsmanager')
+          brokerArn = os.environ['BrokerArn']
+          response = client.get_secret_value(
+              SecretId=os.environ['SecretManagerArn']
+          )
+          userDetails = json.loads(response['SecretString'])
+          credentials = pika.PlainCredentials(userDetails['username'], userDetails['password'])
+          context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+
+          brokerHost = "{}.mq.{}.amazonaws.com".format(brokerArn.split(':')[-1],os.environ['AWS_REGION'])
+          cp = pika.ConnectionParameters(
+              port=5671,
+              host=brokerHost,
+              credentials=credentials,
+              ssl_options=pika.SSLOptions(context)
+          )
+
+          def lambda_handler(event, context):
+              
+              bodyJson=''
+              if 'isBase64Encoded' in event and event['isBase64Encoded']:
+                  bodyJson = base64.b64decode(event['body'])
+              else:
+                  bodyJson = event['body']
+              id=uuid.uuid4()
+              messageBody = json.loads(bodyJson)
+              messageBody['id'] = str(id)
+              messageBody['UpdateId'] = 'UpdateId1'
+              print(messageBody)
+              connection = pika.BlockingConnection(cp)
+              channel = connection.channel()
+              channel.queue_declare(queue="OrderConfirmation")
+              channel.basic_publish(exchange="", routing_key="OrderConfirmation", body=json.dumps(messageBody))
+              connection.close()
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('Order Received!!')
+              }
+              
+  OrderProcessingFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.9
+      Role: !GetAtt OrderProcessingFunctionExecutionRole.Arn
+      Handler: index.lambda_handler
+      Layers: 
+        - !Ref PikaLayerARN
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref 'AmazonMQSecurityGroup'
+        SubnetIds:
+          - !Ref 'PrivateSubnet0'
+          - !Ref 'PrivateSubnet1'
+          - !Ref 'PrivateSubnet2'
+      Environment:
+        Variables:
+          SecretManagerArn: !Ref SecretAmazonMQ
+          BrokerArn: !GetAtt AmazonMQBroker.Arn 
+      Code:
+        ZipFile: |
+          from __future__ import print_function
+          import pika
+          import ssl
+          import boto3
+          import json
+          import base64 
+          import os
+
+          client = boto3.client('secretsmanager')
+          brokerArn = os.environ['BrokerArn']
+          response = client.get_secret_value(
+            SecretId=os.environ['SecretManagerArn']
+          )
+          userDetails = json.loads(response['SecretString'])
+          credentials = pika.PlainCredentials(userDetails['username'], userDetails['password'])
+          context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+
+          brokerHost = "{}.mq.{}.amazonaws.com".format(brokerArn.split(':')[-1],os.environ['AWS_REGION'])
+          cp = pika.ConnectionParameters(
+            port=5671,
+            host=brokerHost,
+            credentials=credentials,
+            ssl_options=pika.SSLOptions(context)
+          )
+
+
+          def lambda_handler(event, context):
+              print(event)
+              if 'rmqMessagesByQueue' not in event:
+                  print("Invalid event data")
+                  return {
+                      'statusCode': 404
+                  }
+              connection = pika.BlockingConnection(cp)
+              channel = connection.channel()
+              channel.queue_declare(queue="OrderProcessing")
+              for queue in event["rmqMessagesByQueue"]:
+                  messageCnt = len(event['rmqMessagesByQueue'][queue])
+                  for message in event['rmqMessagesByQueue'][queue]:
+                      data = base64.b64decode(message['data'])
+                      messageBody = json.loads(data)
+                      messageBody['UpdateId2'] = 'UpdateId2'
+                      print(messageBody)
+                      channel.basic_publish(exchange="", routing_key="OrderProcessing", body=json.dumps(messageBody))
+              connection.close()
+
+  OrderCompleteFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.9
+      Role: !GetAtt OrderCompleteFunctionExecutionRole.Arn
+      Handler: index.lambda_handler
+      Layers: 
+        - !Ref PikaLayerARN
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref 'AmazonMQSecurityGroup'
+        SubnetIds:
+          - !Ref 'PrivateSubnet0'
+          - !Ref 'PrivateSubnet1'
+          - !Ref 'PrivateSubnet2'
+      Environment:
+        Variables:
+          SecretManagerArn: !Ref SecretAmazonMQ
+          BrokerArn: !GetAtt AmazonMQBroker.Arn 
+      Code:
+        ZipFile: |
+          from __future__ import print_function
+          import boto3
+          import json
+          import base64 
+          import os
+          import datetime
+          dynamodb = boto3.client('dynamodb')
+
+          database = boto3.resource('dynamodb')
+          table = database.Table('orders')
+
+          def lambda_handler(event, context):
+              print(event)
+              if 'rmqMessagesByQueue' not in event:
+                  print("Invalid event data")
+                  return {
+                      'statusCode': 404
+                  }
+
+              for queue in event["rmqMessagesByQueue"]:
+                  messageCnt = len(event['rmqMessagesByQueue'][queue])
+                  print(f'Total messages received from event source: {messageCnt}' )
+                  for message in event['rmqMessagesByQueue'][queue]:
+                      data = base64.b64decode(message['data'])
+                      messageBody = json.loads(data)
+                      messageBody['UpdateId3'] = 'UpdateId3'
+                      print(messageBody)
+                      current_timestamp = datetime.datetime.now().isoformat()
+                      messageBody['createdAt'] = current_timestamp
+                      table.put_item(Item = messageBody)
+
+  AuthInvokeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AuthFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${API}/*
+
+  APIInvokeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref APIFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${API}/*
+
+  Authorizer:
+    Type: 'AWS::ApiGateway::Authorizer'
+    Properties:
+      AuthorizerResultTtlInSeconds: '300'
+      AuthorizerUri: !Join 
+        - ''
+        - - 'arn:aws:apigateway:'
+          - !Ref 'AWS::Region'
+          - ':lambda:path/2015-03-31/functions/'
+          - !GetAtt 
+            - AuthFunction
+            - Arn
+          - /invocations
+      Type: TOKEN
+      IdentitySource: method.request.header.Auth
+      Name: DefaultAuthorizer
+      RestApiId: !Ref API
+
+  EventSourceMapping0:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: 
+        Fn::GetAtt: 
+          - "AmazonMQBroker"
+          - "Arn" 
+      FunctionName:
+        Fn::GetAtt:
+          - "OrderProcessingFunction"
+          - "Arn"
+      Enabled: true
+      BatchSize: 1
+      Queues: 
+        - "OrderConfirmation"
+      SourceAccessConfigurations:
+        - Type: "BASIC_AUTH"
+          URI: !Ref "SecretAmazonMQ"
+        - Type: VIRTUAL_HOST
+          URI: /
+
+  EventSourceMapping1:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: 
+        Fn::GetAtt: 
+          - "AmazonMQBroker"
+          - "Arn" 
+      FunctionName:
+        Fn::GetAtt:
+          - "OrderCompleteFunction"
+          - "Arn"
+      Enabled: true
+      BatchSize: 1
+      Queues: 
+        - "OrderProcessing"
+      SourceAccessConfigurations:
+        - Type: "BASIC_AUTH"
+          URI: !Ref "SecretAmazonMQ"
+        - Type: VIRTUAL_HOST
+          URI: /
+
+  SMInterfaceEndpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      VpcEndpointType: Interface
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.secretsmanager'
+      PrivateDnsEnabled: true
+      VpcId: !Ref 'VPC'
+      SubnetIds: 
+        - !Ref 'PrivateSubnet0'
+        - !Ref 'PrivateSubnet1'
+        - !Ref 'PrivateSubnet2'
+      SecurityGroupIds:
+        - !Ref 'EndpointSecurityGroup'
+
+  STSInterfaceEndpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      VpcEndpointType: Interface
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.sts'
+      PrivateDnsEnabled: true
+      VpcId: !Ref 'VPC'
+      SubnetIds: 
+        - !Ref 'PrivateSubnet0'
+        - !Ref 'PrivateSubnet1'
+        - !Ref 'PrivateSubnet2'
+      SecurityGroupIds:
+        - !Ref 'EndpointSecurityGroup'
+
+  LambdaInterfaceEndpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      VpcEndpointType: Interface
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.lambda'
+      PrivateDnsEnabled: true
+      VpcId: !Ref 'VPC'
+      SubnetIds: 
+        - !Ref 'PrivateSubnet0'
+        - !Ref 'PrivateSubnet1'
+        - !Ref 'PrivateSubnet2'
+      SecurityGroupIds:
+        - !Ref 'EndpointSecurityGroup'
+
+  DynamoDBEndpoint:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      RouteTableIds:
+        - !Ref PrivateRouteTable0
+        - !Ref PrivateRouteTable1
+        - !Ref PrivateRouteTable2
+      ServiceName:
+        !Sub "com.amazonaws.${AWS::Region}.dynamodb"
+      VpcId: !Ref VPC
+
+Outputs:
+  TestCommand:
+    Value: !Sub curl -X POST https://${API}.execute-api.${AWS::Region}.amazonaws.com/test -H "Auth:tokenformq" -d '{"productId":123456, "quantity":100}' 
